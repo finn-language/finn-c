@@ -1,0 +1,11 @@
+let guh: String = "buh";
+
+for (character: u8) : guh
+    io::println(character as char)!;
+
+
+for (let index: int = 0; index <= guh.length; index++)
+    io::println(guh[index] as char)!;
+
+while index <= guh.length
+    io::println(guh[index++] as char)!;

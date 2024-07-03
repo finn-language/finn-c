@@ -1,0 +1,11 @@
+
+program     -> expression ( ";" | EOF )
+expression  -> equality
+equality    -> comparison ( ( "==" | "!=" ) comparison )*
+comparison  -> term ( ( ">" | ">=" | "<" | "<=" ) term )*
+term        -> factor ( ( "+" | "-" ) factor )*
+factor      -> suffix ( ( "*" | "/" ) suffix )*
+suffix      -> prefix ( "++" | "--" | "?" | "!" )*
+prefix      -> ( "-" | ".." | "*" | "&" )* primary
+primary     -> IDENT | STRING | NUMBER | BOOL | "nil"
+grouping    -> "(" expression ")"
