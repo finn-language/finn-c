@@ -3,8 +3,12 @@
 #include <memory>
 
 #include "lib/lexer.hpp"
-//#include "lib/parser.hpp"
+#include "lib/parser.hpp"
 #include "lib/expr.hpp"
+
+bool exists(char* name) {
+    return static_cast<bool>(std::ifstream(name));
+}
 
 std::string read_file(char* file_path) {
     std::string source = "";
@@ -14,8 +18,7 @@ std::string read_file(char* file_path) {
 
     if (source_file.is_open()) {
         while (std::getline(source_file, line)) {
-            line.append("\n");
-            source.append(line);
+            source.append(line + "\n");
         }
     } else {
         std::cout << "Unable to open \"" << file_path << "\"\n";
@@ -25,27 +28,75 @@ std::string read_file(char* file_path) {
 }
 
 int main(int argc, char** argv) {
-    std::string source = read_file(argv[1]);
-    std::cout << "[INFO]: Successfully opened " << argv[1] << ".\n";
+    std::string filename = "";
+    char* c_filename     = nullptr;
+    bool time_comp       = false;
+    bool be_quiet        = false;
+    bool show_token      = false;
+    bool show_ast        = false;
 
-    std::string filename(argv[1]);
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) == "--timecomp") {
+            time_comp = true;
+        }
 
-    std::vector<std::shared_ptr<Token>> tokens = (new Lexer(source, filename))->lex();
-    std::cout << "[INFO]: Successfully lexed source.\n";
+        else if (std::string(argv[i]) == "--token") {
+            show_token = true;
+        }
+        
+        else if (std::string(argv[i]) == "--quiet") {
+            be_quiet = true;
+        }
 
-    int amount_of_tokens = 0;
-    for (; amount_of_tokens <= tokens.size(); amount_of_tokens++) 
-        std::cout << tokens[amount_of_tokens]->lexeme << "\n";
-
-    std::cout << amount_of_tokens << "\n";
-
-
-    std::cout << "guh\n";
-    /*
-    auto statements = (new Parser(tokens, filename))->parse();
-
-    for (auto& statement : statements)
-        statement->print();*/
+        else if (std::string(argv[i]) == "--ast") {
+            show_ast = true;
+        }
+        
+        else if (exists(argv[i])) {
+            filename = argv[i];
+            c_filename = argv[i];
+        }
+    }
     
-    exit(0);
+    if (filename == "") {
+        std::cout << "No valid file was provided";
+        return 1;
+    }
+        
+    std::string source = read_file(c_filename);
+
+    if (!be_quiet) 
+        std::cout << "[INFO]: Successfully opened " << filename << ".\n";
+
+    Lexer* lexer = new Lexer(source, filename);
+    std::vector<std::shared_ptr<Token>> tokens = lexer->lex();
+    delete lexer;
+    
+    if (!be_quiet)
+        std::cout << "[INFO]: Successfully lexed source.\n";
+
+    if (show_token) {
+        int amount_of_tokens = 0;
+        for (; amount_of_tokens <= tokens.size(); amount_of_tokens++) 
+            std::cout << tokens[amount_of_tokens]->lexeme << "\n";
+
+        std::cout << amount_of_tokens << "\n";
+    }
+
+    Parser* parser = new Parser(tokens, filename);
+    std::vector<std::shared_ptr<Stmt::Stmt>> statements = parser->parse();
+    delete parser;
+    
+    if (!be_quiet)
+        std::cout << "[INFO]: Successfully parsed source.\n";
+
+    if (show_ast) {
+        for (const std::shared_ptr<Stmt::Stmt> statement : statements) {
+            statement->print();
+            std::cout << "\n";
+        }
+        std::cout << statements.size() << "\n";
+    }
+
+    return 0;
 }
