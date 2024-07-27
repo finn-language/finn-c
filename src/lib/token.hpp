@@ -1,13 +1,20 @@
 #ifndef TOKEN_HPP
 #define TOKEN_HPP
 
+#pragma once
+
 #include <string>
 #include <vector>
 
-//#include "..llvm/IRReader/IRReader.h"
-
 typedef enum {
     STRING = 0,
+    NUMBER,
+    BOOL,
+    FLOAT,
+    DOUBLE,
+    UINT,
+
+    INT_TYPE,
 
     INT,
     INT8,
@@ -22,10 +29,12 @@ typedef enum {
     UINT64,
     UINT128,
 
-    FLOAT,
-    DOUBLE,
+    FLOAT_TYPE,
+    DOUBLE_TYPE,
 
-    BOOL,
+    BOOL_TYPE,
+
+    STR,
 
     NIL,
 
@@ -55,6 +64,7 @@ typedef enum {
 
     EQUAL, // =
     EQUAL_EQUAL, // ==
+    FAT_ARROW, // =>
 
     OR, // or
     AND, // and
@@ -64,6 +74,12 @@ typedef enum {
     FALSE,
 
     AMPERSAND, // &
+    AT, // @
+
+    LET,
+    CONST,
+
+    STATIC,
 
     COMMA, // ,
     PIPE, // |
@@ -106,19 +122,23 @@ typedef enum {
     FUNC,
     ENUM,
     STRUCT,
-    IMPL,
+
+    FINAL,
+    CLASS,
+    
+    INTERFACE,
 
     RETURN,
 
-    END_OF_FILE, // for some reason g++ panics when you have "EOF" as a value
+    END_OF_FILE // for some reason g++ panics when you have "EOF" as a value
 } TokenType;
 
 struct Token {
-    TokenType token_type;
-    std::string lexeme;
-    TokenType data_type;
+    TokenType        token_type;
+    std::string      lexeme;
+    TokenType        data_type;
     std::vector<int> position;
-    std::string filename;
+    std::string      filename;
 };
 
 #endif
