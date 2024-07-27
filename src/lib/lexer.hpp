@@ -1,6 +1,8 @@
 #ifndef LEXER_HPP
 #define LEXER_HPP
 
+#pragma once
+
 #include <vector>
 #include <string>
 #include <iostream>
@@ -109,7 +111,7 @@ class Lexer {
                     is_binary = true;
                     buffer = "";
                     this->advance(); // move past 'b' character
-                    while (std::isdigit(this->peek()))
+                    while (this->peek() == '0' || this->peek() == '1')
                         buffer += this->advance();
                     break;
                 }
@@ -124,9 +126,13 @@ class Lexer {
                 }
 
                 case '.': {
+                    this->advance();
+                    if (this->peek() == '.') {
+                        this->index--;
+                        break;
+                    }
                     is_float = true;
                     buffer += '.';
-                    this->advance(); // move past '.' character
                     while (std::isdigit(this->peek()))
                         buffer += this->advance();
                     break;
@@ -147,41 +153,43 @@ class Lexer {
 
             while (std::isalnum(this->peek()) || this->peek() == '_')
                 buffer += this->advance();
-        
-
-            std::string text = buffer;
 
             // the great if else wall (please keep it aligned, the wall must not fall)
-            if      (text == "if")     this->create_token(TokenType::IF,      text, TokenType::INTRINSIC);
-            else if (text == "else")   this->create_token(TokenType::ELSE,    text, TokenType::INTRINSIC);               
-            else if (text == "for")    this->create_token(TokenType::FOR,     text, TokenType::INTRINSIC); 
-            else if (text == "while")  this->create_token(TokenType::WHILE,   text, TokenType::INTRINSIC); 
-            else if (text == "func")   this->create_token(TokenType::FUNC,    text, TokenType::INTRINSIC);
-            else if (text == "struct") this->create_token(TokenType::STRUCT,  text, TokenType::INTRINSIC);
-            else if (text == "enum")   this->create_token(TokenType::ENUM,    text, TokenType::INTRINSIC);
-            else if (text == "impl")   this->create_token(TokenType::IMPL,    text, TokenType::INTRINSIC);
-            else if (text == "return") this->create_token(TokenType::RETURN,  text, TokenType::INTRINSIC);
-            else if (text == "import") this->create_token(TokenType::IMPORT,  text, TokenType::INTRINSIC);
-            else if (text == "int")    this->create_token(TokenType::INT,     text, TokenType::INTRINSIC);
-            else if (text == "i8")     this->create_token(TokenType::INT8,    text, TokenType::INTRINSIC);
-            else if (text == "i16")    this->create_token(TokenType::INT16,   text, TokenType::INTRINSIC);
-            else if (text == "i32")    this->create_token(TokenType::INT32,   text, TokenType::INTRINSIC);
-            else if (text == "i64")    this->create_token(TokenType::INT64,   text, TokenType::INTRINSIC);
-            else if (text == "i128")   this->create_token(TokenType::INT128,  text, TokenType::INTRINSIC);
-            else if (text == "u8")     this->create_token(TokenType::UINT8,   text, TokenType::INTRINSIC);
-            else if (text == "u16")    this->create_token(TokenType::UINT16,  text, TokenType::INTRINSIC);
-            else if (text == "u32")    this->create_token(TokenType::UINT32,  text, TokenType::INTRINSIC);
-            else if (text == "u64")    this->create_token(TokenType::UINT64,  text, TokenType::INTRINSIC);
-            else if (text == "u128")   this->create_token(TokenType::UINT128, text, TokenType::INTRINSIC);
-            else if (text == "bool")   this->create_token(TokenType::BOOL,    text, TokenType::INTRINSIC);
-            else if (text == "float")  this->create_token(TokenType::FLOAT,   text, TokenType::INTRINSIC);
-            else if (text == "double") this->create_token(TokenType::DOUBLE,  text, TokenType::INTRINSIC);
-            else if (text == "nil")    this->create_token(TokenType::NIL,     text, TokenType::INTRINSIC);
-            else if (text == "true")   this->create_token(TokenType::TRUE,    text, TokenType::BOOL     );
-            else if (text == "false")  this->create_token(TokenType::FALSE,   text, TokenType::BOOL     );
-            else if (text == "type")   this->create_token(TokenType::TYPE,    text, TokenType::INTRINSIC);
-            else                       this->create_token(TokenType::IDENT,   text, TokenType::IDENT    );
-            
+            if      (buffer == "if")        this->create_token(TokenType::IF,        buffer, TokenType::INTRINSIC);
+            else if (buffer == "else")      this->create_token(TokenType::ELSE,      buffer, TokenType::INTRINSIC);               
+            else if (buffer == "for")       this->create_token(TokenType::FOR,       buffer, TokenType::INTRINSIC); 
+            else if (buffer == "while")     this->create_token(TokenType::WHILE,     buffer, TokenType::INTRINSIC); 
+            else if (buffer == "func")      this->create_token(TokenType::FUNC,      buffer, TokenType::INTRINSIC);
+            else if (buffer == "struct")    this->create_token(TokenType::STRUCT,    buffer, TokenType::INTRINSIC);
+            else if (buffer == "enum")      this->create_token(TokenType::ENUM,      buffer, TokenType::INTRINSIC);
+            else if (buffer == "class")     this->create_token(TokenType::CLASS,     buffer, TokenType::INTRINSIC);
+            else if (buffer == "final")     this->create_token(TokenType::FINAL,     buffer, TokenType::INTRINSIC);
+            else if (buffer == "interface") this->create_token(TokenType::INTRINSIC, buffer, TokenType::INTRINSIC);
+            else if (buffer == "return")    this->create_token(TokenType::RETURN,    buffer, TokenType::INTRINSIC);
+            else if (buffer == "import")    this->create_token(TokenType::IMPORT,    buffer, TokenType::INTRINSIC);
+            else if (buffer == "string")    this->create_token(TokenType::STR,       buffer, TokenType::INTRINSIC);
+            else if (buffer == "int")       this->create_token(TokenType::INT,       buffer, TokenType::INTRINSIC);
+            else if (buffer == "i8")        this->create_token(TokenType::INT8,      buffer, TokenType::INTRINSIC);
+            else if (buffer == "i16")       this->create_token(TokenType::INT16,     buffer, TokenType::INTRINSIC);
+            else if (buffer == "i32")       this->create_token(TokenType::INT32,     buffer, TokenType::INTRINSIC);
+            else if (buffer == "i64")       this->create_token(TokenType::INT64,     buffer, TokenType::INTRINSIC);
+            else if (buffer == "i128")      this->create_token(TokenType::INT128,    buffer, TokenType::INTRINSIC);
+            else if (buffer == "u8")        this->create_token(TokenType::UINT8,     buffer, TokenType::INTRINSIC);
+            else if (buffer == "u16")       this->create_token(TokenType::UINT16,    buffer, TokenType::INTRINSIC);
+            else if (buffer == "u32")       this->create_token(TokenType::UINT32,    buffer, TokenType::INTRINSIC);
+            else if (buffer == "u64")       this->create_token(TokenType::UINT64,    buffer, TokenType::INTRINSIC);
+            else if (buffer == "u128")      this->create_token(TokenType::UINT128,   buffer, TokenType::INTRINSIC);
+            else if (buffer == "bool")      this->create_token(TokenType::BOOL,      buffer, TokenType::INTRINSIC);
+            else if (buffer == "float")     this->create_token(TokenType::FLOAT,     buffer, TokenType::INTRINSIC);
+            else if (buffer == "double")    this->create_token(TokenType::DOUBLE,    buffer, TokenType::INTRINSIC);
+            else if (buffer == "nil")       this->create_token(TokenType::NIL,       buffer, TokenType::INTRINSIC);
+            else if (buffer == "true")      this->create_token(TokenType::TRUE,      buffer, TokenType::BOOL     );
+            else if (buffer == "false")     this->create_token(TokenType::FALSE,     buffer, TokenType::BOOL     );
+            else if (buffer == "type")      this->create_token(TokenType::TYPE,      buffer, TokenType::INTRINSIC);
+            else if (buffer == "let")       this->create_token(TokenType::LET,       buffer, TokenType::INTRINSIC);
+            else if (buffer == "const")     this->create_token(TokenType::CONST,     buffer, TokenType::INTRINSIC);
+            else if (buffer == "static")    this->create_token(TokenType::STATIC,    buffer, TokenType::INTRINSIC);
+            else                            this->create_token(TokenType::IDENT,     buffer, TokenType::IDENT    );
         }
 
         inline void lex_token(void) {
@@ -213,11 +221,28 @@ class Lexer {
                     }
                 }
 
+                case '@': {
+                    this->create_token(TokenType::AT, "@", TokenType::OPERAND);
+                    break;
+                }
+
                 case '/': {
                     if (this->match('/')) {
                         while (this->peek() != '\n')
                             this->advance();
                         break;
+                    } else if (this->match('*')) {
+                        bool is_looping = true;
+                        while (is_looping) {
+                            if (this->match('*')) {
+                                if (this->match('/')) {
+                                    is_looping = false;
+                                    break;
+                                }
+                            } else {
+                                this->advance();
+                            }
+                        } break;
                     } else {
                         this->create_token(TokenType::DIV, "/", TokenType::OPERAND);
                         break;
@@ -266,6 +291,7 @@ class Lexer {
 
                 case '&': {
                     this->create_token(TokenType::AMPERSAND, "&", TokenType::OPERAND);
+                    break;
                 }
 
                 case ';': {
