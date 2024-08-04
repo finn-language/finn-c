@@ -14,25 +14,31 @@
 class Lexer {
     std::string source;
     std::string filename;
+    std::vector<std::string> lines;
 
     int index;
     int start;
 
     int line;
-    int cursor;
+
+    int initial_position;
+    int final_position;
 
     std::vector<std::shared_ptr<Token>> output;
 
     public:
-        inline Lexer(const std::string source, const std::string filename) {
+        inline Lexer(const std::string source, const std::string filename, const std::vector<std::string> lines) {
             this->source = source;
             this->filename = filename;
+            this->lines = lines;
 
             this->index = 0;
             this->start = 0;
 
             this->line = 1;
-            this->cursor = 1;
+
+            this->initial_position = 1;
+            this->final_position = 1;
 
             this->output = {};
         }
@@ -42,6 +48,7 @@ class Lexer {
         inline std::vector<std::shared_ptr<Token>> lex(void) {
             while (!this->at_end()) {
                 this->start = this->index;
+                this->initial_position = this->final_position;
                 this->lex_token();
             }
             this->create_token(TokenType::END_OF_FILE, "", TokenType::INTRINSIC);
@@ -64,7 +71,7 @@ class Lexer {
         inline char advance(void) {
             char character = this->source[this->index];
             this->index++;
-            this->cursor++;
+            this->final_position++;
             return character;
         }
 
@@ -73,7 +80,7 @@ class Lexer {
             token.token_type = token_type;
             token.lexeme = lexeme;
             token.data_type = data_type;
-            token.position = {this->line, this->cursor};
+            token.position = Position{this->line, std::vector<int>{this->initial_position, this->final_position}};
             token.filename = this->filename;
             this->output.push_back(std::make_shared<Token>(token));
         }
@@ -84,8 +91,11 @@ class Lexer {
             while (!this->at_end() && this->peek() != '"') {
                 if (this->peek() == '\n') {
                     this->line++;
-                    this->cursor = 0;
+                    this->final_position = 1;
                 }
+
+                if (this->peek() == '\"') {}
+
                 buffer += this->peek();
                 this->advance();
             }
@@ -164,11 +174,12 @@ class Lexer {
             else if (buffer == "enum")      this->create_token(TokenType::ENUM,      buffer, TokenType::INTRINSIC);
             else if (buffer == "class")     this->create_token(TokenType::CLASS,     buffer, TokenType::INTRINSIC);
             else if (buffer == "final")     this->create_token(TokenType::FINAL,     buffer, TokenType::INTRINSIC);
-            else if (buffer == "interface") this->create_token(TokenType::INTRINSIC, buffer, TokenType::INTRINSIC);
+            else if (buffer == "interface") this->create_token(TokenType::INTERFACE, buffer, TokenType::INTRINSIC);
             else if (buffer == "return")    this->create_token(TokenType::RETURN,    buffer, TokenType::INTRINSIC);
+            else if (buffer == "throw")     this->create_token(TokenType::THROW,     buffer, TokenType::INTRINSIC);
             else if (buffer == "import")    this->create_token(TokenType::IMPORT,    buffer, TokenType::INTRINSIC);
             else if (buffer == "string")    this->create_token(TokenType::STR,       buffer, TokenType::INTRINSIC);
-            else if (buffer == "int")       this->create_token(TokenType::INT,       buffer, TokenType::INTRINSIC);
+            else if (buffer == "int")       this->create_token(TokenType::INT_TYPE,  buffer, TokenType::INTRINSIC);
             else if (buffer == "i8")        this->create_token(TokenType::INT8,      buffer, TokenType::INTRINSIC);
             else if (buffer == "i16")       this->create_token(TokenType::INT16,     buffer, TokenType::INTRINSIC);
             else if (buffer == "i32")       this->create_token(TokenType::INT32,     buffer, TokenType::INTRINSIC);
@@ -179,7 +190,7 @@ class Lexer {
             else if (buffer == "u32")       this->create_token(TokenType::UINT32,    buffer, TokenType::INTRINSIC);
             else if (buffer == "u64")       this->create_token(TokenType::UINT64,    buffer, TokenType::INTRINSIC);
             else if (buffer == "u128")      this->create_token(TokenType::UINT128,   buffer, TokenType::INTRINSIC);
-            else if (buffer == "bool")      this->create_token(TokenType::BOOL,      buffer, TokenType::INTRINSIC);
+            else if (buffer == "bool")      this->create_token(TokenType::BOOL_TYPE, buffer, TokenType::INTRINSIC);
             else if (buffer == "float")     this->create_token(TokenType::FLOAT,     buffer, TokenType::INTRINSIC);
             else if (buffer == "double")    this->create_token(TokenType::DOUBLE,    buffer, TokenType::INTRINSIC);
             else if (buffer == "nil")       this->create_token(TokenType::NIL,       buffer, TokenType::INTRINSIC);
@@ -239,6 +250,9 @@ class Lexer {
                                     is_looping = false;
                                     break;
                                 }
+                            } else if (this->match('\n')) {
+                                this->line++;
+                                this->final_position = 1;
                             } else {
                                 this->advance();
                             }
@@ -263,9 +277,9 @@ class Lexer {
                     if (this->match('<')) {
                         this->create_token(TokenType::SHL, "<<", TokenType::OPERAND);
                     } else if (this->match('=')) {
-                        this->create_token(TokenType::GT_EQUALS, "<=", TokenType::OPERAND);
+                        this->create_token(TokenType::LT_EQUALS, "<=", TokenType::OPERAND);
                     } else {
-                        this->create_token(TokenType::GT, "<", TokenType::OPERAND);                    
+                        this->create_token(TokenType::LT, "<", TokenType::OPERAND);                    
                     } break;
                 }
 
@@ -273,9 +287,9 @@ class Lexer {
                     if (this->match('>')) {
                         this->create_token(TokenType::SHR, ">>", TokenType::OPERAND);
                     } else if (this->match('=')) {
-                        this->create_token(TokenType::LT_EQUALS, ">=", TokenType::OPERAND);
+                        this->create_token(TokenType::GT_EQUALS, ">=", TokenType::OPERAND);
                     } else {
-                        this->create_token(TokenType::LT, ">", TokenType::OPERAND);                    
+                        this->create_token(TokenType::GT, ">", TokenType::OPERAND);                    
                     } break;
                 }
 
@@ -300,10 +314,7 @@ class Lexer {
                 }
 
                 case ':': {
-                    if (this->match('=')) {
-                        this->create_token(TokenType::COLON_EQUAL, ":=", TokenType::OPERAND);
-                        break;
-                    } else if (this->match(':')) {
+                    if (this->match(':')) {
                         this->create_token(TokenType::SCOPE, "::", TokenType::OPERAND);
                         break;
                     } else {
@@ -328,7 +339,10 @@ class Lexer {
                 }
 
                 case '!': {
-                    this->create_token(TokenType::BANG, "!", TokenType::OPERAND);
+                    if (this->match('=')) 
+                        this->create_token(TokenType::NOT_EQUAL, "!=", TokenType::OPERAND);
+                    else
+                        this->create_token(TokenType::BANG, "!", TokenType::OPERAND);
                     break;
                 }
 
@@ -372,19 +386,15 @@ class Lexer {
                     break;
                 }
 
-                case '\r': {
+                case '\r': 
+                case '\t':
+                case ' ':
                     break;
-                }
-                case '\t': {
-                    break;
-                }
-                case ' ': {
-                    break;
-                }
+                
 
                 case '\n': {
                     this->line++;
-                    this->cursor = 1;
+                    this->final_position = 1;
                     break;
                 }
 
@@ -396,7 +406,7 @@ class Lexer {
                         this->number();
                         break;
                     } else {
-                        std::cout << this->filename << ":" << this->line << ":" << this->cursor << ": " 
+                        std::cout << this->filename << ":" << this->line << ":" << this->final_position << ": " 
                                   << "Found unexpected character \"" << this->source[this->index - 1] << "\"\n";
                         exit(1);
                     }
