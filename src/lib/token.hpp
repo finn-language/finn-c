@@ -129,16 +129,31 @@ typedef enum {
     INTERFACE,
 
     RETURN,
+    THROW,
 
     END_OF_FILE // for some reason g++ panics when you have "EOF" as a value
 } TokenType;
+
+struct Position {
+    int line;
+    std::vector<int> offset;
+};
 
 struct Token {
     TokenType        token_type;
     std::string      lexeme;
     TokenType        data_type;
-    std::vector<int> position;
+    Position         position;
     std::string      filename;
+
+    std::string dump(int indent = 0) {
+        std::string root = ""; 
+        
+        for (int i = 1; i <= indent; i++)
+            root += " "; root += "Token(" + this->lexeme + ")\n";
+
+        return root;
+    }
 };
 
 #endif
