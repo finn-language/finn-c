@@ -9,6 +9,7 @@
 
 #include "token.hpp"
 #include "expr.hpp"
+#include "errors.hpp"
 
 #define TYPES TokenType::NUMBER, TokenType::INT8, TokenType::INT16, TokenType::INT32, TokenType::INT64, TokenType::INT128, \
               TokenType::UINT, TokenType::UINT8, TokenType::UINT16, TokenType::UINT32, TokenType::UINT64, TokenType::UINT128, \
@@ -16,15 +17,13 @@
 
 class Parser {
     std::vector<std::shared_ptr<Token>> tokens;
-    std::string filename;
+    std::vector<std::string> lines;
 
     int index = 0;
 
     public:
-        Parser(std::vector<std::shared_ptr<Token>> tokens, std::string filename) {
-            this->tokens = tokens;
-            this->filename = filename;
-
+        Parser(std::vector<std::shared_ptr<Token>> tokens, std::vector<std::string> lines) 
+          : tokens(tokens), lines(lines) {
             this->index = index;
         }
 
@@ -67,7 +66,9 @@ class Parser {
 
         void consume(TokenType expected, std::string message) {
             if (!this->match({expected})) {
-                std::cout << this->peek()->filename << ":" << this->peek()->position[0] << ":" << this->peek()->position[1] << ": " << message << "\n";
+                Error* error = new Error(message, this->lines, this->previous());
+                error->print();
+                delete error;
                 exit(1);
             }
         }
@@ -75,9 +76,34 @@ class Parser {
         std::shared_ptr<Stmt::Stmt> declaration(void) {
             switch (this->peek()->token_type) {
 
+                case TokenType::TYPE: {
+                    this->advance();
+                    return this->type();
+                }
+
+                case TokenType::INTERFACE: {
+                    this->advance();
+                    return this->interface();
+                }
+
                 case TokenType::FUNC: {
                     this->advance();
                     return this->func();
+                }
+
+                case TokenType::STRUCT: {
+                    this->advance();
+                    return this->_struct();
+                }
+
+                case TokenType::ENUM: {
+                    this->advance();
+                    return this->_enum();
+                }
+
+                case TokenType::IMPORT: {
+                    this->advance();
+                    return this->import();
                 }
 
                 default: {
@@ -87,12 +113,115 @@ class Parser {
             }
         }
 
-        std::shared_ptr<Stmt::Stmt> func(void) {
+        std::shared_ptr<Stmt::Stmt> interface(void) {
             std::shared_ptr<Token> name = this->advance();
+            this->consume(TokenType::L_BRACE, "Expected opening brace in interface definition");
+            std::vector<std::shared_ptr<Stmt::Stmt>> body = {};
+
+            while (!this->match({TokenType::R_BRACE}))
+                body.push_back(this->declaration());
+
+            return std::make_shared<Stmt::Interface>(Stmt::Interface(std::move(name), body));
+        }
+
+        std::shared_ptr<Stmt::Stmt> type(void) {
+            std::shared_ptr<Stmt::Stmt> body;
+
+            if (this->match({TokenType::STRUCT}))
+                body = this->_struct();
+
+            else if (this->match({TokenType::IDENT})) {
+
+            }
+        }
+
+        std::shared_ptr<Stmt::Stmt> import(void) {
+            std::shared_ptr<Expr::Expr> module = this->scope();
+            this->consume(TokenType::SEMICOLON, "Expected semicolon at the end of statement");
+            return std::make_shared<Stmt::Import>(Stmt::Import(std::move(module)));
+        }
+
+        std::shared_ptr<Stmt::Stmt> _enum(void) {
+            std::shared_ptr<Token> enum_name = this->advance();
+            std::vector<std::shared_ptr<Expr::Expr>> types = {};
+            std::vector<std::shared_ptr<Stmt::Stmt>> body = {};
+
+            if (this->match({TokenType::COLON})) {
+                types.push_back(this->scope());
+
+                while (this->match({TokenType::COMMA}))
+                    types.push_back(this->scope());
+            }
+
+            this->consume(TokenType::L_BRACE, "Expected opening brace in enum definition");
+            if (this->match({TokenType::IDENT})) {
+                std::shared_ptr<Token> name = this->previous();
+                std::shared_ptr<Expr::Expr> value = nullptr;
+
+                if (this->match({TokenType::EQUAL}))
+                    value = this->equality();
+
+                body.push_back(std::make_shared<Stmt::Mutable>(Stmt::Mutable(std::move(name), types, std::move(value))));
+
+
+                while (this->match({TokenType::COMMA})) {
+                    std::shared_ptr<Token> name = this->advance();
+                    std::shared_ptr<Expr::Expr> value = nullptr;
+
+                    if (this->match({TokenType::EQUAL}))
+                        value = this->equality();
+
+                    body.push_back(std::make_shared<Stmt::Mutable>(Stmt::Mutable(std::move(name), types, std::move(value))));
+                }
+            }
+            this->consume(TokenType::R_BRACE, "Expected closing brace in enum definition");
+
+
+            return std::make_shared<Stmt::Enum>(Stmt::Enum(std::move(enum_name), types, std::move(body)));
+        }
+
+        std::shared_ptr<Stmt::Stmt> _struct(void) {
+            std::shared_ptr<Token> name = this->advance();
+
+            if (this->match({TokenType::LT})) {
+                std::cout << "Struct generics are not implemented yet.";
+                exit(1);
+            }
+
+            this->consume(TokenType::L_BRACE, "Expected opening brace in struct definition");
+
+            std::vector<std::shared_ptr<Stmt::Stmt>> members = {};
+
+            if (this->match({TokenType::IDENT})) {
+                this->index--;
+                members.push_back(this->arg());
+
+                while (this->match({TokenType::COMMA})) 
+                    members.push_back(this->arg());
+                
+            }
+
+            this->consume(TokenType::R_BRACE, "Expected closing brace in struct definition");
+
+            return std::make_shared<Stmt::Struct>(Stmt::Struct(std::move(name), members));
+        }
+
+        std::shared_ptr<Stmt::Stmt> func(void) {
+            std::shared_ptr<Expr::Expr> name = this->literal();
+
+            while (!this->match({TokenType::L_PAREN, TokenType::LT}) && this->match({TokenType::DOT})) {
+                name = std::make_shared<Expr::Scope>(Expr::Scope(std::move(name), this->literal()));
+            } this->index--;
+
             std::vector<std::shared_ptr<Stmt::Stmt>> args = {};
 
-            std::vector<std::shared_ptr<Stmt::Stmt>> return_types = {};
-            std::vector<std::shared_ptr<Stmt::Stmt>> throw_types = {};
+            std::vector<std::shared_ptr<Expr::Expr>> return_types = {};
+            std::vector<std::shared_ptr<Expr::Expr>> throw_types = {};
+
+            if (this->match({TokenType::LT})) {
+                std::cout << "TODO: Function generics are not implemented yet\n";
+                exit(1);
+            }
 
             this->consume(TokenType::L_PAREN, "Expected opening parenthesis in function declaration");
 
@@ -104,6 +233,25 @@ class Parser {
             }
 
             this->consume(TokenType::R_PAREN, "Expected closing parenthesis in function declaration");
+
+            if (this->match({TokenType::COLON})) {
+
+                if (this->match({TokenType::IDENT, TYPES})) {
+                    this->index--;
+
+                    return_types.push_back(this->scope());
+
+                    while (this->match({TokenType::PIPE}))
+                        return_types.push_back(this->scope());
+                }                
+
+                if (this->match({TokenType::QUESTION})) {
+                    throw_types.push_back(this->scope());
+
+                    while (this->match({TokenType::PIPE}))
+                        throw_types.push_back(this->scope());
+                }
+            }
 
             this->consume(TokenType::L_BRACE, "guh");
             std::shared_ptr<Stmt::Stmt> body = this->block();
@@ -126,9 +274,9 @@ class Parser {
                 body = this->equality();
 
             if (body == nullptr)
-                return std::make_shared<Stmt::Mutable>(Stmt::Mutable(std::move(name), false, types, std::make_shared<Expr::Nil>(Expr::Nil())));
+                return std::make_shared<Stmt::Mutable>(Stmt::Mutable(std::move(name), types, std::make_shared<Expr::Nil>(Expr::Nil())));
             else
-                return std::make_shared<Stmt::Mutable>(Stmt::Mutable(std::move(name), false, types, std::move(body)));
+                return std::make_shared<Stmt::Mutable>(Stmt::Mutable(std::move(name), types, std::move(body)));
         }
 
         std::shared_ptr<Stmt::Stmt> control_flow(void) {
@@ -149,6 +297,16 @@ class Parser {
                     return std::move(this->if_else());
                 }
 
+                case TokenType::THROW: {
+                    this->advance();
+                    return this->_throw();
+                }
+
+                case TokenType::RETURN: {
+                    this->advance();
+                    return this->_return();
+                }
+
                 case TokenType::L_BRACE: {
                     this->advance();
                     return std::move(this->block());
@@ -159,6 +317,20 @@ class Parser {
                 }
 
             }
+        }
+
+        std::shared_ptr<Stmt::Stmt> _throw(void) {
+            std::shared_ptr<Expr::Expr> body = this->equality();
+            this->consume(TokenType::SEMICOLON, "Expected semicolon after throw statement");
+            return std::make_shared<Stmt::Throw>(Stmt::Throw(std::move(body)));
+        }
+
+        std::shared_ptr<Stmt::Stmt> _return(void) {
+            std::shared_ptr<Expr::Expr> body = this->equality();
+
+            this->consume(TokenType::SEMICOLON, "Expected semicolon after return statement");
+
+            return std::make_shared<Stmt::Return>(Stmt::Return(std::move(body)));
         }
 
         std::shared_ptr<Stmt::Stmt> for_loop(void) {
@@ -261,13 +433,6 @@ class Parser {
                     return std::move(this->constant());
                 }
 
-                case TokenType::IDENT: {
-                    if (this->tokens[this->index + 1]->token_type == TokenType::EQUAL)
-                        return std::move(this->reassign());
-                    else 
-                        return std::move(this->expression());
-                }
-
                 default: {
                     return std::move(this->expression());
                 }
@@ -298,14 +463,6 @@ class Parser {
             return std::make_shared<Stmt::Constant>(Stmt::Constant(std::move(name), types, std::move(value)));
         }
 
-        std::shared_ptr<Stmt::Stmt> reassign(void) {
-            std::shared_ptr<Token> name = this->advance();
-            this->consume(TokenType::EQUAL, "Expected equals sign in reassignment");
-            std::shared_ptr<Expr::Expr> value = this->equality();
-            this->consume(TokenType::SEMICOLON, "Expected semicolon at the end of expression");
-            return std::make_shared<Stmt::Reassign>(Stmt::Reassign(std::move(name), std::move(value)));
-        }
-
         std::shared_ptr<Stmt::Stmt> mutable_var(void) {
             std::shared_ptr<Token> name = this->advance();
             std::vector<std::shared_ptr<Expr::Expr>> types = {};
@@ -314,13 +471,10 @@ class Parser {
             bool is_static = false;
 
             if (this->match({TokenType::COLON})) {
-                if (this->match({TokenType::STATIC})) 
-                    is_static = true;
-                
-                types.push_back(std::move(this->literal()));
-                while (this->match({TokenType::PIPE})) {
-                    types.push_back(std::move(this->literal()));
-                }
+                types.push_back(std::move(this->scope()));
+
+                while (this->match({TokenType::PIPE})) 
+                    types.push_back(std::move(this->scope()));
             }
 
             if (this->match({TokenType::IDENT})) {
@@ -330,13 +484,13 @@ class Parser {
 
             if (this->match({TokenType::SEMICOLON})) {
                 value = std::make_shared<Expr::Nil>(Expr::Nil());
-                return std::make_shared<Stmt::Mutable>(Stmt::Mutable(std::move(name), is_static, types, std::move(value)));
+                return std::make_shared<Stmt::Mutable>(Stmt::Mutable(std::move(name), types, std::move(value)));
             }
 
             this->consume(TokenType::EQUAL, "Expected equals operator in variable definition");
             value = std::move(this->equality());
             this->consume(TokenType::SEMICOLON, "Expected semicolon at the end of expression");
-            return std::make_shared<Stmt::Mutable>(Stmt::Mutable(std::move(name), is_static, types, std::move(value)));
+            return std::make_shared<Stmt::Mutable>(Stmt::Mutable(std::move(name), types, std::move(value)));
         }
 
         std::shared_ptr<Stmt::Stmt> expression(void) {
@@ -421,36 +575,47 @@ class Parser {
                 std::shared_ptr<Token> operand = this->previous();
                 std::shared_ptr<Expr::Expr> expr = this->prefix();
                 return std::move(std::make_shared<Expr::Prefix>(Expr::Prefix(expr, operand)));
-            } return std::move(this->call());
+            } return std::move(this->reassign());
+        }
+
+        std::shared_ptr<Expr::Expr> reassign(void) {
+            std::shared_ptr<Expr::Expr> expr = this->scope();
+            
+            if (this->match({TokenType::EQUAL})) {
+                expr = std::make_shared<Expr::Reassign>(Expr::Reassign(std::move(expr), this->equality()));
+            }
+
+            return expr;
+        }
+
+        std::shared_ptr<Expr::Expr> scope(void) {
+            std::shared_ptr<Expr::Expr> expr = this->call();
+
+            while (this->match({TokenType::DOT}))
+                expr = std::make_shared<Expr::Scope>(Expr::Scope(std::move(expr), this->call()));
+            
+            return std::move(expr);
         }
 
         std::shared_ptr<Expr::Expr> call(void) {
-            std::shared_ptr<Expr::Expr> expr = this->scope();
+            std::shared_ptr<Expr::Expr> expr = this->literal();
 
             if (this->match({TokenType::L_PAREN})) {
                 std::vector<std::shared_ptr<Expr::Expr>> args = {};
 
                 if (!this->match({TokenType::R_PAREN})) {
                     args.push_back(std::move(this->equality()));
+
                     while (this->match({TokenType::COMMA})) {
                         args.push_back(std::move(this->equality()));
                     }
-                }
 
-                this->consume(TokenType::R_PAREN, "Expected closing parenthesis");
+                    this->consume(TokenType::R_PAREN, "Expected closing parenthesis");
+                }
 
                 expr = std::make_shared<Expr::Call>(Expr::Call(std::move(expr), args));
             }
 
-            return std::move(expr);
-        }
-
-        std::shared_ptr<Expr::Expr> scope(void) {
-            std::shared_ptr<Expr::Expr> expr = this->literal();
-
-            while (this->match({TokenType::DOT}))
-                expr = std::make_shared<Expr::Scope>(Expr::Scope(std::move(expr), this->scope()));
-            
             return std::move(expr);
         }
 
@@ -484,12 +649,12 @@ class Parser {
 
                 case TokenType::TRUE: {
                     this->advance();
-                    return std::move(std::make_shared<Expr::IntLit>(Expr::IntLit(1)));
+                    return std::move(std::make_shared<Expr::BoolLit>(Expr::BoolLit(true)));
                 }
 
                 case TokenType::FALSE: {
                     this->advance();
-                    return std::move(std::make_shared<Expr::IntLit>(Expr::IntLit(0)));
+                    return std::move(std::make_shared<Expr::BoolLit>(Expr::BoolLit(false)));
                 }
 
                 case TokenType::L_PAREN: {
@@ -502,10 +667,10 @@ class Parser {
                 default: {
 
                     if (this->match({TYPES})) {
-                        return std::make_shared<Expr::Variable>(Expr::Variable(this->previous()->lexeme));
+                        return std::make_shared<Expr::Type>(Expr::Type(this->previous()));
                     } else {
                         std::cout << this->peek()->lexeme << "\n";
-                        std::cout << "you messed up\n";
+                        Error("you messed up", lines, this->peek()).print();
                         exit(1);
                     }
                 }
